@@ -1,0 +1,125 @@
+version: '3.7'
+
+services:
+
+  spring-boot-app:
+    container_name: spring-boot-app
+    build:
+      context: ./spring-boot-app
+    image: spring-boot-app:latest
+    depends_on:
+      - redis-sentinel-1
+      - redis-sentinel-2
+      - redis-sentinel-3
+      - mongodb
+    ports:
+      - '127.0.0.1:8081:8081'
+
+  mongodb:
+    image: mongo:5.0
+    container_name: mongo-db
+    restart: always
+    ports:
+      - 27017:27017
+
+  redis-master:
+    container_name: redis-master
+    image: redis:6-alpine
+    command:  redis-server --maxmemory 3mb --maxmemory-policy noeviction
+    volumes:
+      - "./.data:/data"
+    ports:
+      - "6379:6379"
+
+  redis-slave:
+    container_name: redis-slave
+    image: redis:6-alpine
+    command: redis-server --slaveof redis-master 6379 --maxmemory 3mb --maxmemory-policy noeviction
+    links:
+      - redis-master
+    depends_on:
+      - redis-master
+    volumes:
+      - "./.data:/data"
+
+  redis-sentinel-1:
+    container_name: redis-sentinel-1
+    build:
+      context: ./redis-sentinel/1
+    depends_on:
+      - redis-master
+    links:
+      - redis-master
+    ports:
+      - "26379:26379"
+
+  redis-sentinel-2:
+    container_name: redis-sentinel-2
+    build:
+      context: ./redis-sentinel/2
+    depends_on:
+      - redis-master
+    links:
+      - redis-master
+    ports:
+      - "26380:26380"
+
+  redis-sentinel-3:
+    container_name: redis-sentinel-3
+    build:
+      context: ./redis-sentinel/3
+    depends_on:
+      - redis-master
+    links:
+      - redis-master
+    ports:
+      - "26381:26381"
+
+  telegraf:
+    image: telegraf:1.18-alpine
+    container_name: telegraf
+    restart: always
+    user: root
+    entrypoint: "telegraf"
+    volumes:
+      - ./metrics/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - influxdb
+      - mongodb
+    links:
+      - influxdb
+    ports:
+      - '8125:8125'
+    labels:
+      - "docker.group=telegraf"
+
+  influxdb:
+    image: influxdb:1.8-alpine
+    container_name: influxdb
+    restart: always
+    environment:
+      - INFLUXDB_DB=influx
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=admin
+    ports:
+      - '8086:8086'
+    volumes:
+      - ./metrics/influx/data:/var/lib/influxdb
+
+  grafana:
+    image: grafana/grafana:8.0.2
+    container_name: grafana-server
+    restart: always
+    depends_on:
+      - influxdb
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    links:
+      - influxdb
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - ./metrics/grafana/data:/var/lib/grafana
