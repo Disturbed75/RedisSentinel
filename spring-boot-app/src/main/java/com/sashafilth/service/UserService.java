@@ -6,9 +6,7 @@ import com.sashafilth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 @Service
 public class UserService {
@@ -51,6 +49,45 @@ public class UserService {
         }
         System.out.println("From db");
         return userRepository.findByUniqueNumber(randomNumber);
+    }
+
+    public User findSpecific() {
+        int uniqueNumber = 100;
+        Map<String, Object> res = cacheHelper.getWithExpDetails("USER_SPECIFIC", "user_specific");
+        Object obj = res.get("body");
+        Long exp = (Long) res.get("exp");
+
+        boolean needToUpdateCache = needToUpdateCache(exp);
+        if (needToUpdateCache) {
+            System.out.println("NEED TO UPDATE CACHE");
+        }
+
+        if (obj == null || needToUpdateCache) {
+            System.out.println("From db");
+            User dbUser = userRepository.findByUniqueNumber(uniqueNumber);
+            cacheHelper.put("USER_SPECIFIC", "user_specific", dbUser, 120);
+            return dbUser;
+        }
+
+        System.out.println("From cache");
+        return (User) obj;
+    }
+
+    private boolean needToUpdateCache(long expirationSeconds) {
+        int beta = 1;
+        int delta = 20; // seconds
+        long timeInSeconds = new Date().getTime() / 1000;
+        long expiry = timeInSeconds + expirationSeconds;
+        double randomValue = getRandomDoubleValue();
+
+        double prob = timeInSeconds - delta * beta * Math.log(randomValue);
+        return (prob >= expiry);
+    }
+
+    private double getRandomDoubleValue() {
+        int min = 0;
+        int max = 1;
+        return min + (max - min) * new Random().nextDouble();
     }
 
     private User saveToCache(Integer userNumber, User user) {

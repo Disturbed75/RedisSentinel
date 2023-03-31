@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -29,7 +31,19 @@ public class RedisCacheHelperValueOperations implements CacheHelper  {
     }
 
     @Override
+    public Map<String, Object> getWithExpDetails(String cacheName, Object key) {
+        Map<String, Object> res = new HashMap<>();
+        String validKey = constructKey(cacheName, key);
+        Long exp = redisTemplate.getExpire(validKey, TimeUnit.SECONDS);
+        Object body = redisTemplate.opsForValue().get(validKey);
+        res.put("exp", exp);
+        res.put("body", body);
+        return res;
+    }
+
+    @Override
     public void remove(String cacheName, Object key) {
+//        redisTemplate.exp
         redisTemplate.opsForValue().getOperations().delete(constructKey(cacheName, key));
     }
 

@@ -32,4 +32,10 @@ public class UserController {
         User user = userService.findRandom();
         return new ResponseEntity<>(user, HttpStatus.OK);
     }
+
+    @GetMapping(path = "/find-specific")
+    public ResponseEntity<User> findSpecificRandom() {
+        User user = userService.findSpecific();
+        return new ResponseEntity<>(user, HttpStatus.OK);
+    }
 }
